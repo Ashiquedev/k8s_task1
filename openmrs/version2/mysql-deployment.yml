@@ -1,0 +1,76 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim-openmrs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-premium
+  resources:
+    requests:
+      storage: 1Gi
+   
+---
+# Configure 'Deployment' of mysql server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  selector: # mysql Pod Should contain same labels
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels: # Must match 'Service' and 'Deployment' selectors
+        app: mysql
+    spec:
+      containers:
+        - image: mysql:8.0 # image from docker-hub
+          name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD # Setting Root Password of mysql From a 'Secret'
+              valueFrom:
+                secretKeyRef:
+                  name: db-admin # Name of the 'Secret'
+                  key: password   # 'key' inside the Secret which contains required 'value'
+            - name: MYSQL_USER # Setting USER username on mysql From a 'Secret'
+              valueFrom:
+                secretKeyRef:
+                  name: db-user
+                  key: username
+            - name: MYSQL_PASSWORD # Setting USER Password on mysql From a 'Secret'
+              valueFrom:
+                secretKeyRef:
+                  name: db-user
+                  key: password
+            - name: MYSQL_DATABASE # Setting Database Name from a 'ConfigMap'
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: name
+          ports:
+            - containerPort: 3306
+          volumeMounts:        # Mounting volume obtained from Persistent Volume Claim
+            - name: mysql-persistent-storage-openmrs
+              mountPath: /var/lib/mysql #This is the path in the container on which the mounting will take place.
+      volumes:
+        - name: mysql-persistent-storage-openmrs # Obtaining 'volume' from PVC
+          persistentVolumeClaim:
+            claimName: mysql-pv-claim-openmrs
+
+---
+# Define a 'Service' To Expose mysql to Other Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql 
+  labels:
+    app: mysql
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3306

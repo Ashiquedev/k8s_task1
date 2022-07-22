@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openmrs
+spec:
+  selector:
+    matchLabels:
+      app: openmrs
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: openmrs
+    spec:
+      containers:
+        - name: openmrs
+          image: ashik1431/openmrs:1.0
+          ports:
+            - containerPort: 8080
+          env:   # Setting Enviornmental Variables
+            - name: DB_HOST   # Setting Database host address from configMap
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config  # name of configMap
+                  key: host
+            - name: DB_NAME  # Setting Database name from configMap
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: name
+            - name: DB_USERNAME  # Setting Database username from Secret
+              valueFrom:
+                secretKeyRef:
+                  name: db-user # Secret Name
+                  key: username
+            - name: DB_PASSWORD # Setting Database password from Secret
+              valueFrom:
+                secretKeyRef:
+                  name: db-user
+                  key: password
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openmrs-svc
+  labels:
+    name: openmrs
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+  selector:
+    app: openmrs
